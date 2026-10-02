@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="description" content="UNBLACK — czytaj książkę online lub pobierz wybrany rozdział w formacie PDF.">
+  <title>UNBLACK — Czytaj online</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%230a0a0a%22/><path d=%22M18 14v23c0 9 5 14 14 14s14-5 14-14V14h-8v23c0 5-2 7-6 7s-6-2-6-7V14z%22 fill=%22%23e21d2f%22/></svg>">
+
+  <style>
+    :root {
+      --black: #090909;
+      --panel: #111111;
+      --panel-soft: #181818;
+      --line: #2b2b2b;
+      --red: #e21d2f;
+      --red-dark: #b30f1f;
+      --paper: #f1eee8;
+      --muted: #969696;
+      --white: #ffffff;
+      --radius: 18px;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .42);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: var(--white);
+      background:
+        radial-gradient(circle at 82% -15%, rgba(226, 29, 47, .15), transparent 32rem),
+        var(--black);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 3px solid rgba(226, 29, 47, .55);
+      outline-offset: 3px;
+    }
+
+    .topbar {
+      height: 82px;
+      padding: 0 clamp(20px, 4vw, 64px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      background: rgba(9, 9, 9, .88);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--white);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 11px;
+      height: 36px;
+      background: var(--red);
+      transform: skew(-9deg);
+      box-shadow: 6px 0 0 rgba(226, 29, 47, .22);
+    }
+
+    .brand-name {
+      font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+      font-weight: 900;
+      letter-spacing: .12em;
+      line-height: 1;
+    }
+
+    .brand-name span {
+      color: var(--red);
+    }
+
+    .topbar-note {
+      color: var(--muted);
+      font-size: .73rem;
+      font-weight: 750;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .layout {
+      width: min(1540px, 100%);
+      margin: 0 auto;
+      padding: clamp(22px, 4vw, 58px) clamp(16px, 4vw, 64px) 46px;
+      display: grid;
+      grid-template-columns: minmax(240px, 290px) minmax(0, 1fr);
+      gap: clamp(22px, 3vw, 42px);
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 112px;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--red);
+      font-size: .7rem;
+      font-weight: 850;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 26px;
+      height: 2px;
+      background: currentColor;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 8ch;
+      font-size: clamp(2.6rem, 4.8vw, 4.6rem);
+      font-weight: 900;
+      letter-spacing: -.065em;
+      line-height: .9;
+      text-wrap: balance;
+    }
+
+    .intro {
+      margin: 20px 0 30px;
+      color: #b5b5b5;
+      font-size: .94rem;
+      line-height: 1.65;
+    }
+
+    .section-label {
+      margin: 0 0 12px;
+      color: #898989;
+      font-size: .67rem;
+      font-weight: 800;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    .chapter-list {
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+      list-style: none;
+    }
+
+    .chapter-message {
+      padding: 15px 14px;
+      border: 1px dashed #353535;
+      border-radius: 12px;
+      color: #929292;
+      font-size: .78rem;
+      line-height: 1.5;
+    }
+
+    .chapter-message::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      margin-right: 9px;
+      display: inline-block;
+      border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 5px rgba(226, 29, 47, .12);
+    }
+
+    .chapter-button {
+      width: 100%;
+      padding: 15px 14px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 18px;
+      gap: 11px;
+      align-items: center;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: #a8a8a8;
+      background: transparent;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: color .2s ease, background .2s ease, border-color .2s ease, transform .2s ease;
+    }
+
+    .chapter-button:hover {
+      color: var(--white);
+      background: var(--panel-soft);
+      transform: translateX(3px);
+    }
+
+    .chapter-button[aria-current="true"] {
+      color: var(--white);
+      border-color: #393939;
+      background: var(--panel-soft);
+    }
+
+    .chapter-number {
+      color: #626262;
+      font-size: .7rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .chapter-button[aria-current="true"] .chapter-number {
+      color: var(--red);
+    }
+
+    .chapter-title {
+      overflow: hidden;
+      font-size: .86rem;
+      font-weight: 700;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chapter-arrow {
+      color: #5e5e5e;
+      font-size: 1rem;
+      text-align: right;
+    }
+
+    .reader-card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .reader-toolbar {
+      min-height: 82px;
+      padding: 14px 18px 14px clamp(18px, 3vw, 30px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .current-chapter {
+      min-width: 0;
+    }
+
+    .current-chapter small {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--red);
+      font-size: .64rem;
+      font-weight: 850;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    .current-chapter h2 {
+      margin: 0;
+      overflow: hidden;
+      font-size: clamp(.95rem, 1.8vw, 1.15rem);
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .toolbar-actions {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: none;
+    }
+
+    .action {
+      min-width: 0;
+      min-height: 42px;
+      padding: 0 15px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      color: var(--white);
+      background: #1a1a1a;
+      font-size: .78rem;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color .2s ease, background .2s ease, transform .2s ease;
+    }
+
+    .action:hover {
+      border-color: #595959;
+      background: #252525;
+      transform: translateY(-1px);
+    }
+
+    .action[aria-disabled="true"] {
+      pointer-events: none;
+      opacity: .42;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .action.primary {
+      border-color: var(--red);
+      background: var(--red);
+    }
+
+    .action.primary:hover {
+      border-color: #ef3143;
+      background: #ef3143;
+    }
+
+    .action svg {
+      width: 17px;
+      height: 17px;
+      flex: none;
+    }
+
+    .pdf-shell {
+      position: relative;
+      height: clamp(620px, calc(100vh - 230px), 940px);
+      min-height: 520px;
+      background: #262626;
+    }
+
+    .pdf-viewer {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border: 0;
+      background: var(--paper);
+    }
+
+    .reader-footer {
+      min-height: 64px;
+      padding: 11px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .reader-status {
+      margin: 0;
+      color: #8b8b8b;
+      font-size: .73rem;
+      line-height: 1.4;
+    }
+
+    .reader-status strong {
+      color: #bdbdbd;
+    }
+
+    .chapter-nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .nav-button {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #363636;
+      border-radius: 10px;
+      color: var(--white);
+      background: #191919;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: background .2s ease, border-color .2s ease;
+    }
+
+    .nav-button:hover:not(:disabled) {
+      border-color: var(--red);
+      background: var(--red);
+    }
+
+    .nav-button:disabled {
+      color: #505050;
+      cursor: not-allowed;
+      opacity: .62;
+    }
+
+    .page-footer {
+      width: min(1540px, 100%);
+      margin: 0 auto;
+      padding: 0 clamp(16px, 4vw, 64px) 38px;
+      color: #898989;
+      font-size: .69rem;
+      letter-spacing: .06em;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sidebar {
+        position: static;
+      }
+
+      h1 {
+        max-width: none;
+        font-size: clamp(2.7rem, 11vw, 4.8rem);
+      }
+
+      .intro {
+        max-width: 60ch;
+        margin-bottom: 22px;
+      }
+
+      .chapter-list {
+        display: flex;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        scrollbar-width: thin;
+      }
+
+      .chapter-list li {
+        min-width: min(290px, 80vw);
+      }
+
+      .pdf-shell {
+        height: 72vh;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        height: 70px;
+      }
+
+      .topbar-note {
+        display: none;
+      }
+
+      .layout {
+        padding-top: 28px;
+      }
+
+      .reader-card {
+        border-radius: 14px;
+      }
+
+      .reader-toolbar {
+        padding: 14px;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .current-chapter {
+        width: 100%;
+      }
+
+      .toolbar-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .action {
+        padding: 0 12px;
+        font-size: .72rem;
+        white-space: nowrap;
+      }
+
+      .action-label-long {
+        display: none;
+      }
+
+      .pdf-shell {
+        height: 68vh;
+        min-height: 470px;
+      }
+
+      .reader-footer {
+        padding: 11px 13px;
+      }
+
+      .reader-status span {
+        display: none;
+      }
+
+      .reader-status span.is-important {
+        display: inline;
+      }
+
+      .page-footer {
+        text-align: center;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="UNBLACK — strona główna">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name"><span>UN</span>BLACK</span>
+    </a>
+    <span class="topbar-note">Książka online</span>
+  </header>
+
+  <main class="layout" id="top">
+    <aside class="sidebar" aria-label="Informacje i rozdziały">
+      <p class="eyebrow">Czytaj bez ograniczeń</p>
+      <h1>UNBLACK</h1>
+      <p class="intro">
+        Wybierz rozdział, czytaj bezpośrednio w przeglądarce albo pobierz plik PDF na swoje urządzenie.
+      </p>
+
+      <p class="section-label">Spis treści</p>
+      <ol class="chapter-list" id="chapterList" aria-label="Lista rozdziałów" aria-busy="true">
+        <li class="chapter-message">Szukam rozdziałów…</li>
+      </ol>
+    </aside>
+
+    <section class="reader-card" aria-label="Czytnik książki">
+      <div class="reader-toolbar">
+        <div class="current-chapter">
+          <small id="chapterKicker">Biblioteka</small>
+          <h2 id="chapterHeading">Szukam rozdziałów…</h2>
+        </div>
+
+        <div class="toolbar-actions">
+          <a class="action" id="openButton" target="_blank" rel="noopener" aria-label="Otwórz PDF w nowej karcie" aria-disabled="true" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>
+            </svg>
+            <span>Otwórz<span class="action-label-long"> w karcie</span></span>
+          </a>
+          <a class="action primary" id="downloadButton" download="UNBLACK-rozdzial-01.pdf" aria-disabled="true" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M12 3v12m0 0 5-5m-5 5-5-5M5 21h14"/>
+            </svg>
+            <span>Pobierz PDF</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="pdf-shell">
+        <iframe
+          class="pdf-viewer"
+          id="pdfViewer"
+          src="about:blank"
+          title="Czytnik PDF UNBLACK">
+        </iframe>
+      </div>
+
+      <div class="reader-footer">
+        <p class="reader-status" aria-live="polite">
+          <strong id="chapterCounter">…</strong>
+          <span id="readerHelp">&nbsp;·&nbsp; Jeśli dokument się nie wyświetla, użyj przycisku „Otwórz w karcie”.</span>
+        </p>
+        <nav class="chapter-nav" aria-label="Nawigacja między rozdziałami">
+          <button class="nav-button" id="previousChapter" type="button" aria-label="Poprzedni rozdział" disabled>←</button>
+          <button class="nav-button" id="nextChapter" type="button" aria-label="Następny rozdział" disabled>→</button>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    UNBLACK · Czytaj po swojemu
+  </footer>
+
+  <script>
+    // Dodawanie rozdziałów: umieść obok strony kolejne pliki
+    // 0.pdf, 1.pdf, 2.pdf itd. Lista utworzy się automatycznie.
+    const configuredLimit = Number(window.UNBLACK_MAX_CHAPTERS);
+    const MAX_CHAPTERS = Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 500;
+    const PROBE_TIMEOUT_MS = 5000;
+    const chapters = [];
+
+    const chapterList = document.getElementById("chapterList");
+    const pdfViewer = document.getElementById("pdfViewer");
+    const chapterKicker = document.getElementById("chapterKicker");
+    const chapterHeading = document.getElementById("chapterHeading");
+    const chapterCounter = document.getElementById("chapterCounter");
+    const readerHelp = document.getElementById("readerHelp");
+    const openButton = document.getElementById("openButton");
+    const downloadButton = document.getElementById("downloadButton");
+    const previousButton = document.getElementById("previousChapter");
+    const nextButton = document.getElementById("nextChapter");
+
+    let activeChapter = 0;
+
+    function chapterTitle(index) {
+      return index === 0 ? "Wstęp — Rozdział 1" : `Rozdział ${index + 1}`;
+    }
+
+    function isPdfResponse(response) {
+      if (!response.ok) return false;
+
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      return contentType.includes("pdf");
+    }
+
+    async function fetchWithTimeout(file, options = {}) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+
+      try {
+        return await fetch(file, { ...options, signal: controller.signal });
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+
+    async function probePdfContent(file) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+      let reader;
+
+      try {
+        const response = await fetch(file, {
+          method: "GET",
+          headers: { Range: "bytes=0-4" },
+          cache: "no-store",
+          signal: controller.signal
+        });
+
+        if (response.status === 404) return "missing";
+        if (!response.ok || !response.body) return "error";
+
+        reader = response.body.getReader();
+        const signature = [];
+
+        while (signature.length < 5) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          for (const byte of value) {
+            signature.push(byte);
+            if (signature.length === 5) break;
+          }
+        }
+
+        const header = String.fromCharCode(...signature);
+        return header === "%PDF-" ? "exists" : "missing";
+      } catch (error) {
+        return "error";
+      } finally {
+        if (reader) await reader.cancel().catch(() => {});
+        window.clearTimeout(timeout);
+      }
+    }
+
+    async function probePdf(file) {
+      try {
+        const response = await fetchWithTimeout(file, { method: "HEAD", cache: "no-store" });
+        if (response.status === 404) return "missing";
+        if (isPdfResponse(response)) return "exists";
+
+        if (!response.ok && response.status !== 405 && response.status !== 501) {
+          return "error";
+        }
+
+        return await probePdfContent(file);
+      } catch (error) {
+        return "error";
+      }
+    }
+
+    function showEmptyState() {
+      chapterList.innerHTML = '<li class="chapter-message">Nie znaleziono pliku 0.pdf.</li>';
+      chapterList.setAttribute("aria-busy", "false");
+      chapterKicker.textContent = "Biblioteka";
+      chapterHeading.textContent = "Brak rozdziałów";
+      chapterCounter.textContent = "0 / 0";
+      pdfViewer.src = "about:blank";
+      setReaderActions(false);
+      previousButton.disabled = true;
+      nextButton.disabled = true;
+    }
+
+    function showDiscoveryError(file) {
+      chapterList.innerHTML = `<li class="chapter-message">Nie udało się sprawdzić pliku ${file}. Odśwież stronę i spróbuj ponownie.</li>`;
+      chapterList.setAttribute("aria-busy", "false");
+      chapterKicker.textContent = "Biblioteka";
+      chapterHeading.textContent = "Błąd wczytywania";
+      chapterCounter.textContent = "0 / 0";
+      pdfViewer.src = "about:blank";
+      setReaderActions(false);
+      previousButton.disabled = true;
+      nextButton.disabled = true;
+    }
+
+    function setReaderActions(enabled) {
+      [openButton, downloadButton].forEach((button) => {
+        button.setAttribute("aria-disabled", String(!enabled));
+
+        if (enabled) {
+          button.removeAttribute("tabindex");
+        } else {
+          button.removeAttribute("href");
+          button.setAttribute("tabindex", "-1");
+        }
+      });
+    }
+
+    async function discoverChapters() {
+      chapterList.setAttribute("aria-busy", "true");
+      let failedFile = "";
+      let limitReached = false;
+
+      if (window.location.protocol === "file:") {
+        addDiscoveredChapter({ title: chapterTitle(0), file: "0.pdf" });
+        readerHelp.textContent = " · Tryb lokalny zakłada obecność 0.pdf. Automatyczne wykrywanie wymaga serwera.";
+        readerHelp.classList.add("is-important");
+      } else {
+        for (let index = 0; index < MAX_CHAPTERS; index += 1) {
+          const file = `${index}.pdf`;
+          const result = await probePdf(file);
+
+          if (result === "missing") break;
+          if (result === "error") {
+            failedFile = file;
+            break;
+          }
+
+          addDiscoveredChapter({ title: chapterTitle(index), file });
+        }
+
+        limitReached = chapters.length === MAX_CHAPTERS && !failedFile;
+      }
+
+      if (chapters.length === 0) {
+        if (failedFile) {
+          showDiscoveryError(failedFile);
+        } else {
+          showEmptyState();
+        }
+        return;
+      }
+
+      chapterList.setAttribute("aria-busy", "false");
+
+      if (failedFile) {
+        readerHelp.textContent = ` · Nie udało się sprawdzić ${failedFile}. Lista może być niepełna.`;
+        readerHelp.classList.add("is-important");
+      } else if (limitReached) {
+        readerHelp.textContent = ` · Osiągnięto limit ${MAX_CHAPTERS} rozdziałów. Lista może być niepełna.`;
+        readerHelp.classList.add("is-important");
+      }
+    }
+
+    function chapterNumber(index) {
+      return String(index + 1).padStart(2, "0");
+    }
+
+    function renderChapterList() {
+      chapterList.replaceChildren();
+
+      chapters.forEach((chapter, index) => {
+        appendChapterListItem(chapter, index);
+      });
+    }
+
+    function appendChapterListItem(chapter, index) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+
+      button.type = "button";
+      button.className = "chapter-button";
+      button.dataset.chapter = String(index);
+      button.setAttribute("aria-current", index === activeChapter ? "true" : "false");
+      button.setAttribute("aria-label", `Otwórz: ${chapter.title}`);
+      button.innerHTML = `
+        <span class="chapter-number">${chapterNumber(index)}</span>
+        <span class="chapter-title">${chapter.title}</span>
+        <span class="chapter-arrow" aria-hidden="true">→</span>
+      `;
+      button.addEventListener("click", () => selectChapter(index));
+
+      item.appendChild(button);
+      chapterList.appendChild(item);
+    }
+
+    function addDiscoveredChapter(chapter) {
+      const index = chapters.length;
+      chapters.push(chapter);
+
+      if (index === 0) chapterList.replaceChildren();
+      appendChapterListItem(chapter, index);
+
+      if (index === 0) {
+        selectChapter(0);
+      } else {
+        chapterCounter.textContent = `${activeChapter + 1} / ${chapters.length}`;
+        nextButton.disabled = activeChapter === chapters.length - 1;
+      }
+    }
+
+    function revealActiveChapter() {
+      const activeButton = chapterList.querySelector('.chapter-button[aria-current="true"]');
+      if (!activeButton || window.innerWidth > 900) return;
+
+      const listRect = chapterList.getBoundingClientRect();
+      const buttonRect = activeButton.getBoundingClientRect();
+      const centeredLeft = chapterList.scrollLeft + buttonRect.left - listRect.left - (listRect.width - buttonRect.width) / 2;
+      chapterList.scrollTo({ left: Math.max(0, centeredLeft), behavior: "auto" });
+    }
+
+    function selectChapter(index) {
+      if (index < 0 || index >= chapters.length) return;
+
+      activeChapter = index;
+      const chapter = chapters[index];
+      const number = chapterNumber(index);
+
+      pdfViewer.src = `${chapter.file}#view=FitH`;
+      pdfViewer.title = `Czytnik PDF — ${chapter.title}`;
+      chapterKicker.textContent = `Rozdział ${number}`;
+      chapterHeading.textContent = chapter.title;
+      chapterCounter.textContent = `${index + 1} / ${chapters.length}`;
+      openButton.href = chapter.file;
+      downloadButton.href = chapter.file;
+      downloadButton.download = `UNBLACK-rozdzial-${number}.pdf`;
+      setReaderActions(true);
+      previousButton.disabled = index === 0;
+      nextButton.disabled = index === chapters.length - 1;
+
+      document.querySelectorAll(".chapter-button").forEach((button, buttonIndex) => {
+        button.setAttribute("aria-current", buttonIndex === index ? "true" : "false");
+      });
+
+      revealActiveChapter();
+    }
+
+    previousButton.addEventListener("click", () => selectChapter(activeChapter - 1));
+    nextButton.addEventListener("click", () => selectChapter(activeChapter + 1));
+
+    discoverChapters();
+  </script>
+</body>
+</html>
