@@ -608,11 +608,8 @@
   </footer>
 
   <script>
-    // Dodawanie rozdziałów: umieść obok strony kolejne pliki
-    // 0.pdf, 1.pdf, 2.pdf itd. Lista utworzy się automatycznie.
-    const configuredLimit = Number(window.UNBLACK_MAX_CHAPTERS);
-    const MAX_CHAPTERS = Number.isInteger(configuredLimit) && configuredLimit > 0 ? configuredLimit : 500;
-    const PROBE_TIMEOUT_MS = 5000;
+    // Dodawanie rozdziałów: umieść obok strony pliki nazwane
+    // 0-wstęp.pdf, 1-nazwa-rozdziału.pdf itd. GitHub Pages utworzy listę automatycznie.
     const chapters = [];
 
     const chapterList = document.getElementById("chapterList");
@@ -628,85 +625,50 @@
 
     let activeChapter = 0;
 
-    function chapterTitle(index) {
-      return index === 0 ? "Wstęp — Rozdział 1" : `Rozdział ${index + 1}`;
+    function encodePdfPath(path) {
+      return path.split("/").map((segment) => encodeURIComponent(segment)).join("/");
     }
 
-    function isPdfResponse(response) {
-      if (!response.ok) return false;
+    function parseChapter(entry) {
+      if (!entry || typeof entry.name !== "string" || typeof entry.path !== "string") return null;
 
-      const contentType = (response.headers.get("content-type") || "").toLowerCase();
-      return contentType.includes("pdf");
+      const match = entry.name.match(/^(\d+)-(.+)\.pdf$/u);
+      if (!match) return null;
+
+      const number = Number(match[1]);
+      if (!Number.isSafeInteger(number) || number < 0) return null;
+
+      const normalizedTitle = match[2]
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!normalizedTitle) return null;
+
+      const title = normalizedTitle.charAt(0).toLocaleUpperCase("pl-PL") + normalizedTitle.slice(1);
+      return { number, title, file: encodePdfPath(entry.path), downloadName: entry.name };
     }
 
-    async function fetchWithTimeout(file, options = {}) {
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    function prepareChapters(entries) {
+      if (!Array.isArray(entries)) throw new Error("Manifest rozdziałów nie jest tablicą.");
 
-      try {
-        return await fetch(file, { ...options, signal: controller.signal });
-      } finally {
-        window.clearTimeout(timeout);
-      }
-    }
+      const prepared = entries.map(parseChapter).filter(Boolean);
+      const usedNumbers = new Set();
 
-    async function probePdfContent(file) {
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
-      let reader;
-
-      try {
-        const response = await fetch(file, {
-          method: "GET",
-          headers: { Range: "bytes=0-4" },
-          cache: "no-store",
-          signal: controller.signal
-        });
-
-        if (response.status === 404) return "missing";
-        if (!response.ok || !response.body) return "error";
-
-        reader = response.body.getReader();
-        const signature = [];
-
-        while (signature.length < 5) {
-          const { value, done } = await reader.read();
-          if (done) break;
-
-          for (const byte of value) {
-            signature.push(byte);
-            if (signature.length === 5) break;
-          }
+      prepared.forEach((chapter) => {
+        if (usedNumbers.has(chapter.number)) {
+          throw new Error(`Powtórzony numer rozdziału: ${chapter.number}.`);
         }
+        usedNumbers.add(chapter.number);
+      });
 
-        const header = String.fromCharCode(...signature);
-        return header === "%PDF-" ? "exists" : "missing";
-      } catch (error) {
-        return "error";
-      } finally {
-        if (reader) await reader.cancel().catch(() => {});
-        window.clearTimeout(timeout);
-      }
-    }
-
-    async function probePdf(file) {
-      try {
-        const response = await fetchWithTimeout(file, { method: "HEAD", cache: "no-store" });
-        if (response.status === 404) return "missing";
-        if (isPdfResponse(response)) return "exists";
-
-        if (!response.ok && response.status !== 405 && response.status !== 501) {
-          return "error";
-        }
-
-        return await probePdfContent(file);
-      } catch (error) {
-        return "error";
-      }
+      return prepared.sort((left, right) => {
+        return left.number - right.number || left.downloadName.localeCompare(right.downloadName, "pl");
+      });
     }
 
     function showEmptyState() {
-      chapterList.innerHTML = '<li class="chapter-message">Nie znaleziono pliku 0.pdf.</li>';
+      chapterList.innerHTML = '<li class="chapter-message">Nie znaleziono rozdziałów. Dodaj plik, np. 0-wstęp.pdf.</li>';
       chapterList.setAttribute("aria-busy", "false");
       chapterKicker.textContent = "Biblioteka";
       chapterHeading.textContent = "Brak rozdziałów";
@@ -717,11 +679,14 @@
       nextButton.disabled = true;
     }
 
-    function showDiscoveryError(file) {
-      chapterList.innerHTML = `<li class="chapter-message">Nie udało się sprawdzić pliku ${file}. Odśwież stronę i spróbuj ponownie.</li>`;
+    function showConfigurationError(message) {
+      const item = document.createElement("li");
+      item.className = "chapter-message";
+      item.textContent = message;
+      chapterList.replaceChildren(item);
       chapterList.setAttribute("aria-busy", "false");
       chapterKicker.textContent = "Biblioteka";
-      chapterHeading.textContent = "Błąd wczytywania";
+      chapterHeading.textContent = "Błąd konfiguracji";
       chapterCounter.textContent = "0 / 0";
       pdfViewer.src = "about:blank";
       setReaderActions(false);
@@ -742,54 +707,52 @@
       });
     }
 
-    async function discoverChapters() {
+    function useLocalFallback() {
+      chapters.push({ number: 0, title: "Wstęp", file: "0-wstęp.pdf", downloadName: "0-wstęp.pdf" });
+      renderChapterList();
+      selectChapter(0);
+      chapterList.setAttribute("aria-busy", "false");
+      readerHelp.textContent = " · Podgląd lokalny pokazuje tylko 0-wstęp.pdf. Pełna lista powstaje po publikacji przez GitHub Pages.";
+      readerHelp.classList.add("is-important");
+    }
+
+    async function loadChapters() {
       chapterList.setAttribute("aria-busy", "true");
-      let failedFile = "";
-      let limitReached = false;
 
       if (window.location.protocol === "file:") {
-        addDiscoveredChapter({ title: chapterTitle(0), file: "0.pdf" });
-        readerHelp.textContent = " · Tryb lokalny zakłada obecność 0.pdf. Automatyczne wykrywanie wymaga serwera.";
-        readerHelp.classList.add("is-important");
-      } else {
-        for (let index = 0; index < MAX_CHAPTERS; index += 1) {
-          const file = `${index}.pdf`;
-          const result = await probePdf(file);
-
-          if (result === "missing") break;
-          if (result === "error") {
-            failedFile = file;
-            break;
-          }
-
-          addDiscoveredChapter({ title: chapterTitle(index), file });
-        }
-
-        limitReached = chapters.length === MAX_CHAPTERS && !failedFile;
-      }
-
-      if (chapters.length === 0) {
-        if (failedFile) {
-          showDiscoveryError(failedFile);
-        } else {
-          showEmptyState();
-        }
+        useLocalFallback();
         return;
       }
 
-      chapterList.setAttribute("aria-busy", "false");
+      try {
+        const response = await fetch("chapters.json", { cache: "no-store" });
+        if (!response.ok) throw new Error(`Nie udało się pobrać chapters.json (HTTP ${response.status}).`);
 
-      if (failedFile) {
-        readerHelp.textContent = ` · Nie udało się sprawdzić ${failedFile}. Lista może być niepełna.`;
-        readerHelp.classList.add("is-important");
-      } else if (limitReached) {
-        readerHelp.textContent = ` · Osiągnięto limit ${MAX_CHAPTERS} rozdziałów. Lista może być niepełna.`;
-        readerHelp.classList.add("is-important");
+        const manifestSource = await response.text();
+        if (manifestSource.trimStart().startsWith("---") && manifestSource.includes("site.static_files")) {
+          useLocalFallback();
+          return;
+        }
+
+        const manifest = JSON.parse(manifestSource);
+        chapters.push(...prepareChapters(manifest));
+
+        if (chapters.length === 0) {
+          showEmptyState();
+          return;
+        }
+
+        renderChapterList();
+        chapterList.setAttribute("aria-busy", "false");
+        selectChapter(0);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "Nieznany błąd manifestu.";
+        showConfigurationError(`${detail} Sprawdź publikację GitHub Pages.`);
       }
     }
 
-    function chapterNumber(index) {
-      return String(index + 1).padStart(2, "0");
+    function chapterNumber(number) {
+      return String(number).padStart(2, "0");
     }
 
     function renderChapterList() {
@@ -803,36 +766,29 @@
     function appendChapterListItem(chapter, index) {
       const item = document.createElement("li");
       const button = document.createElement("button");
+      const numberLabel = document.createElement("span");
+      const titleLabel = document.createElement("span");
+      const arrow = document.createElement("span");
 
       button.type = "button";
       button.className = "chapter-button";
       button.dataset.chapter = String(index);
       button.setAttribute("aria-current", index === activeChapter ? "true" : "false");
       button.setAttribute("aria-label", `Otwórz: ${chapter.title}`);
-      button.innerHTML = `
-        <span class="chapter-number">${chapterNumber(index)}</span>
-        <span class="chapter-title">${chapter.title}</span>
-        <span class="chapter-arrow" aria-hidden="true">→</span>
-      `;
+
+      numberLabel.className = "chapter-number";
+      numberLabel.textContent = chapterNumber(chapter.number);
+      titleLabel.className = "chapter-title";
+      titleLabel.textContent = chapter.title;
+      arrow.className = "chapter-arrow";
+      arrow.setAttribute("aria-hidden", "true");
+      arrow.textContent = "→";
+
+      button.append(numberLabel, titleLabel, arrow);
       button.addEventListener("click", () => selectChapter(index));
 
       item.appendChild(button);
       chapterList.appendChild(item);
-    }
-
-    function addDiscoveredChapter(chapter) {
-      const index = chapters.length;
-      chapters.push(chapter);
-
-      if (index === 0) chapterList.replaceChildren();
-      appendChapterListItem(chapter, index);
-
-      if (index === 0) {
-        selectChapter(0);
-      } else {
-        chapterCounter.textContent = `${activeChapter + 1} / ${chapters.length}`;
-        nextButton.disabled = activeChapter === chapters.length - 1;
-      }
     }
 
     function revealActiveChapter() {
@@ -850,7 +806,7 @@
 
       activeChapter = index;
       const chapter = chapters[index];
-      const number = chapterNumber(index);
+      const number = chapterNumber(chapter.number);
 
       pdfViewer.src = `${chapter.file}#view=FitH`;
       pdfViewer.title = `Czytnik PDF — ${chapter.title}`;
@@ -859,7 +815,7 @@
       chapterCounter.textContent = `${index + 1} / ${chapters.length}`;
       openButton.href = chapter.file;
       downloadButton.href = chapter.file;
-      downloadButton.download = `UNBLACK-rozdzial-${number}.pdf`;
+      downloadButton.download = chapter.downloadName;
       setReaderActions(true);
       previousButton.disabled = index === 0;
       nextButton.disabled = index === chapters.length - 1;
@@ -874,7 +830,7 @@
     previousButton.addEventListener("click", () => selectChapter(activeChapter - 1));
     nextButton.addEventListener("click", () => selectChapter(activeChapter + 1));
 
-    discoverChapters();
+    loadChapters();
   </script>
 </body>
 </html>
